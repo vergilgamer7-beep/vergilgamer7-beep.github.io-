@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gran Mega Rifa Navideña</title>
+<script>
+/* ============================================================
+   CONFIGURACIÓN DE LA BASE DE DATOS (Firebase)
+   1) Ve a https://console.firebase.google.com y crea un proyecto
+   2) En el menu lateral "Build" > "Realtime Database" > "Create Database"
+      (elige una región, por ejemplo europe-west1) y copia la URL que aparece
+   3) En "Project settings" (engranaje) > "General" > "Your apps" > "</>" (Web)
+      y copia los datos de la configuración (apiKey, authDomain, databaseURL)
+   4) En "Authentication" > "Get started" > pestaña "Sign-in method"
+      habilita "Email/Password" y en "Users" > "Add user" crea tu cuenta de admin
+   5) Pega abajo tus datos y en "Reglas" de Realtime Database pon:
+
+      {
+        "rules": {
+          "rifa": {
+            ".read": true,
+            ".write": "auth != null && auth.token.email == 'tu-correo@gmail.com'"
+          }
+        }
+      }
+
+   IMPORTANTE: en las reglas el correo va en minúsculas y tal como lo escribas aquí.
+   Con esto cualquier invitado puede VER los números, pero solo tu cuenta
+   puede escribirlos.
+   ============================================================ */
+window.RIFA_CONFIG = {
+  apiKey: '',
+  authDomain: '',
+  databaseURL: '',
+  adminEmail: ''
+};
+</script>
+<style>
+  :root{
+    --bg:#2b0d14; --bg2:#4a0f1c; --surface:#3a1420; --text:#fbeee7; --muted:#e8b9a8;
+    --border:#6b2333; --accent:#c0392b; --accent2:#1e8a5f;
+    --taken:#7a2331; --taken-bg:#4a1622; --free:#3a1a23; --free-border:#8a3348;
+    --gold:#e8b84b; --gold2:#fff2c9;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  html{scroll-padding-top:env(safe-area-inset-top,0px)}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(circle at 50% 0%,var(--bg2),var(--bg) 70%);
+    color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100%}
+  #app{max-width:900px;margin:0 auto;padding:18px 14px 60px}
+  h1{font-size:1.6rem;margin:.2em 0 .05em;text-align:center;font-weight:800;line-height:1.15;
+    background:linear-gradient(90deg,#fff,var(--gold2) 55%,var(--gold));-webkit-background-clip:text;
+    background-clip:text;color:transparent;text-shadow:0 2px 18px rgba(232,184,75,.25)}
+  .sub{color:var(--muted);text-align:center;font-size:.85rem;margin-bottom:14px}
+  .banner{background:linear-gradient(135deg,var(--accent),var(--gold));color:#fff;border-radius:14px;
+    padding:12px 16px;text-align:center;font-size:.9rem;margin-bottom:16px;
+    box-shadow:0 4px 18px rgba(232,184,75,.25),0 0 0 1px rgba(255,255,255,.08) inset;
+    animation:fadeDown .5s ease, glow 2.4s ease-in-out infinite}
+  .banner b{font-size:1.1rem;letter-spacing:.03em;text-transform:uppercase}
+  @keyframes glow{0%,100%{box-shadow:0 4px 18px rgba(232,184,75,.25)}50%{box-shadow:0 4px 26px rgba(232,184,75,.55)}}
+  @keyframes fadeDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  input[type=text],input[type=search]{flex:1;min-width:160px;padding:10px 12px;border-radius:10px;
+    border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:1rem}
+  .badge{padding:6px 12px;border-radius:999px;font-size:.78rem;font-weight:600}
+  .badge.admin{background:var(--accent2);color:#fff}
+  .badge.guest{background:var(--border);color:var(--muted)}
+  .legend{display:flex;gap:14px;justify-content:center;margin-bottom:12px;font-size:.78rem;color:var(--muted)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .dot.free{background:var(--free-border)}
+  .dot.taken{background:var(--taken)}
+  #stats{text-align:center;font-size:.82rem;color:var(--muted);margin-bottom:10px}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px}
+  .num{border:1px solid var(--free-border);background:var(--free);border-radius:8px;padding:8px 0;
+    text-align:center;font-weight:600;font-size:.82rem;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;
+    user-select:none}
+  .num:hover{transform:scale(1.08);box-shadow:0 3px 8px rgba(0,0,0,.12)}
+  .num.taken{background:var(--taken-bg);border-color:var(--taken);color:var(--taken)}
+  .num.dim{opacity:.15;pointer-events:none}
+  .num.pop{animation:pop .35s ease}
+  @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;
+    z-index:50;padding:16px;animation:fadeDown .18s ease}
+  .card{background:var(--surface);border-radius:16px;padding:20px;max-width:340px;width:100%;
+    box-shadow:0 12px 30px rgba(0,0,0,.25)}
+  .card h2{margin:0 0 4px;font-size:1.1rem}
+  .card p{color:var(--muted);font-size:.85rem;margin:0 0 12px}
+  .card input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);margin-bottom:10px;
+    background:var(--bg);color:var(--text)}
+  .row{display:flex;gap:8px}
+  button.btn{flex:1;padding:10px;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.9rem}
+  .btn.primary{background:var(--accent2);color:#fff}
+  .btn.danger{background:var(--taken);color:#fff}
+  .btn.ghost{background:var(--border);color:var(--text)}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:var(--bg);
+    padding:10px 18px;border-radius:999px;font-size:.85rem;opacity:0;transition:all .25s ease;pointer-events:none;
+    max-width:90vw;text-align:center}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  .confetti{position:fixed;top:-10px;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:60;
+    animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(105vh) rotate(360deg);opacity:.2}}
+  #pinBar{display:flex;gap:8px;margin-bottom:10px}
+  #screenStart{max-width:420px;margin:40px auto 0;text-align:center;animation:fadeDown .4s ease}
+  .startCard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;margin-top:18px}
+  .btn.big{width:100%;padding:16px;font-size:1rem;margin-bottom:2px}
+  .startHint{color:var(--muted);font-size:.78rem;margin:0 0 16px}
+  .btn.small{padding:6px 12px;font-size:.8rem}
+  .topRow{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .card input[type=password]{letter-spacing:.18em}
+
+  .prizes{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+  .prize{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--surface),var(--bg2));
+    border:1px solid var(--gold);border-radius:14px;padding:12px 14px;text-align:left;
+    box-shadow:0 4px 14px rgba(0,0,0,.35);animation:fadeDown .5s ease}
+  .prize.first{border-width:2px;box-shadow:0 4px 20px rgba(232,184,75,.4)}
+  .prize .icon{flex:0 0 auto;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:1.3rem;background:radial-gradient(circle,var(--gold),var(--accent));
+    box-shadow:0 0 12px rgba(232,184,75,.5)}
+  .prize .label{font-size:.72rem;color:var(--gold2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+  .prize .value{font-size:1.15rem;font-weight:800;color:#fff}
+  .prize .note{font-size:.7rem;color:var(--muted)}
+  .valuePill{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--accent),#7a1520);
+    border:1px solid var(--gold);border-radius:999px;padding:8px 20px;margin:6px 0 14px;
+    box-shadow:0 4px 14px rgba(232,184,75,.3)}
+  .valuePill span{color:var(--gold2);font-size:.78rem}
+  .valuePill b{color:var(--gold);font-size:1.3rem}
+  .drawNote{font-size:.72rem;color:var(--muted);border:1px dashed var(--border);border-radius:999px;
+    padding:6px 14px;display:inline-block;margin-bottom:6px}
+
+  .bar{animation:fadeDown .4s ease}
+  .bar.bar-exit{animation:barOut .22s ease forwards}
+  @keyframes barOut{to{opacity:0;transform:translateY(-6px)}}
+  .miniBanner{background:linear-gradient(135deg,var(--surface),var(--bg2));border:1px solid var(--gold);
+    border-radius:12px;padding:8px 12px;text-align:center;font-size:.78rem;color:var(--gold2);margin-bottom:12px}
+  .miniBanner b{color:#fff}
+  .progressWrap{margin-bottom:12px}
+  .progressLabel{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-bottom:4px}
+  .progressTrack{height:10px;border-radius:999px;background:var(--surface);border:1px solid var(--border);overflow:hidden;position:relative}
+  .progressFill{height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:999px;
+    transition:width .5s ease;width:0%}
+  .progressTrack::after{content:'';position:absolute;left:80%;top:-2px;bottom:-2px;width:2px;background:var(--gold2);opacity:.8}
+  .toggleRow{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);white-space:nowrap}
+  .shareBtn{background:var(--border);color:var(--text);border:none;border-radius:8px;padding:8px 10px;
+    font-size:.8rem;cursor:pointer}
+  .waLink{display:block;text-align:center;background:#25D366;color:#fff;border-radius:8px;padding:10px;
+    text-decoration:none;font-weight:600;margin-top:6px}
+
+  .recList{display:flex;flex-direction:column;gap:8px}
+  .rec{display:flex;align-items:center;gap:10px;background:var(--free);border:1px solid var(--free-border);
+    border-radius:12px;padding:10px 12px;animation:fadeDown .25s ease}
+  .rec .rnum{flex:0 0 auto;min-width:56px;text-align:center;font-weight:800;font-size:.9rem;
+    background:linear-gradient(135deg,var(--accent),#7a1520);border:1px solid var(--gold);color:var(--gold2);
+    border-radius:8px;padding:6px 4px}
+  .rec .info{flex:1;min-width:0}
+  .rec .info b{display:block;font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rec .info span{display:block;font-size:.72rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rec .acts{flex:0 0 auto;display:flex;gap:6px}
+  .empty{text-align:center;color:var(--muted);font-size:.85rem;padding:26px 8px}
+
+  .syncBar{display:flex;align-items:center;gap:8px;justify-content:center;border-radius:999px;padding:7px 14px;
+    font-size:.75rem;margin-bottom:12px;border:1px solid var(--border);background:var(--surface);color:var(--muted);
+    text-align:center}
+  .syncBar .pulse{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:currentColor;
+    animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+  .syncBar.live{border-color:#2f7d5c;background:#123a2b;color:#8ff0c0}
+  .syncBar.connecting{border-color:var(--gold);background:#3a2f10;color:var(--gold2)}
+  .syncBar.error{border-color:var(--taken);background:#3a1420;color:#f0a8a8}
+  .formErr{color:#f0a8a8;font-size:.78rem;margin:0 0 10px;min-height:1em}
+  #recCount{font-size:.78rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="screenStart">
+    <h1>🎄 Gran Mega Rifa Navideña</h1>
+    <div class="sub">Registro de números con nombre y apellido</div>
+    <div class="banner bar" id="bannerStart"></div>
+    <div class="prizes bar">
+      <div class="prize first">
+        <div class="icon">👑</div>
+        <div><div class="label">Premio principal · 1er lugar</div>
+          <div class="value">iPhone 18 Pro Max</div>
+          <div class="note">Sorteo Lotería Chance · Letra A 12:00 PM</div></div>
+      </div>
+      <div class="prize">
+        <div class="icon">💵</div>
+        <div><div class="label">2do lugar</div>
+          <div class="value">$300 en efectivo</div>
+          <div class="note">Sorteo Lotería Chance · Letra B 12:00 PM</div></div>
+      </div>
+      <div class="prize">
+        <div class="icon">💵</div>
+        <div><div class="label">3er lugar</div>
+          <div class="value">$100 en efectivo</div>
+          <div class="note">Sorteo Lotería Chance · Letra A 1:00 PM</div></div>
+      </div>
+    </div>
+    <div class="bar" style="text-align:center">
+      <div class="valuePill"><span>Valor del número</span><b>$5</b></div><br>
+      <div class="drawNote">❄️ El sorteo se realizará al vender el 80% de los números ❄️</div>
+    </div>
+    <div class="startCard bar">
+      <div class="syncBar" id="syncStart"><span class="pulse"></span><span class="txt">Conectando…</span></div>
+      <button class="btn primary big" id="goGuest">👥 Entrar como Invitado</button>
+      <p class="startHint">Consulta la disponibilidad de los números</p>
+      <button class="btn ghost big" id="goAdmin" style="margin-top:6px">🔑 Entrar como Admin</button>
+      <p class="startHint">Registra, edita y libera participantes (requiere tu cuenta)</p>
+    </div>
+  </div>
+
+  <div id="mainScreen" style="display:none">
+    <div class="topRow">
+      <button class="btn ghost small" id="backBtn">← Volver</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge guest" id="modeBadge">Invitado</span>
+        <button class="shareBtn" id="adminPanelBtn" style="display:none">🛠️ Modificar datos</button>
+        <button class="shareBtn" id="shareBtn">📤 Compartir</button>
+      </div>
+    </div>
+    <div class="banner bar" id="banner"></div>
+    <div class="syncBar bar" id="syncBar"><span class="pulse"></span><span class="txt">Conectando…</span></div>
+    <div class="miniBanner bar">🎁 <b>iPhone 18 Pro Max</b> de premio principal · número a <b>$5</b></div>
+    <div class="progressWrap bar">
+      <div class="progressLabel"><span id="progressText">0 vendidos</span><span>Meta sorteo: 80%</span></div>
+      <div class="progressTrack"><div class="progressFill" id="progressFill"></div></div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar número (ej: 042)">
+      <label class="toggleRow"><input type="checkbox" id="onlyFree"> Solo disponibles</label>
+    </div>
+    <div class="legend">
+      <span><span class="dot free"></span>Disponible</span>
+      <span><span class="dot taken"></span>Ocupado</span>
+    </div>
+    <div id="stats"></div>
+    <div id="grid"></div>
+  </div>
+
+  <div id="adminScreen" style="display:none">
+    <div class="topRow">
+      <button class="btn ghost small" id="adminBack">← Volver</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="badge admin">Admin</span>
+        <button class="btn danger small" id="logoutBtn">Salir</button>
+      </div>
+
+      </div>
+    </div>
+    <div class="banner bar">🛠️ <b>Modificar datos</b><br>Edita o libera los números ya ocupados</div>
+    <div class="bar" style="margin-bottom:12px">
+      <div class="toolbar">
+        <input type="search" id="adminSearch" placeholder="Buscar por número, nombre, cédula o teléfono">
+      </div>
+      <div class="progressLabel"><span id="recCount">0 registros</span><span>Total: <span id="recTotal">0</span></span></div>
+    </div>
+    <div id="recList" class="recList bar"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script id="raffle-data" type="application/json">{"registros":{}}</script>
+<script>
+(function(){
+  var TOTAL = 1000;
+  var dataEl = document.getElementById('raffle-data');
+  var raw = {};
+  try { raw = JSON.parse(dataEl.textContent || '{}'); } catch(e){ raw = {}; }
+  var registros = raw.registros || {}; // { "042": {nombre, apellido} }
+
+  var isAdmin = false;
+  var dbRef = null, docRef = null, userCap = null;
+  var grid = document.getElementById('grid');
+  var searchEl = document.getElementById('search');
+  var statsEl = document.getElementById('stats');
+  var modeBadge = document.getElementById('modeBadge');
+  var bannerEl = document.getElementById('banner');
+  var bannerStartEl = document.getElementById('bannerStart');
+  var screenStart = document.getElementById('screenStart');
+  var mainScreen = document.getElementById('mainScreen');
+  var adminScreen = document.getElementById('adminScreen');
+  var adminSearchEl = document.getElementById('adminSearch');
+  var recListEl = document.getElementById('recList');
+  var LOCAL_KEY = 'rifa_registros_v1';
+  var FB_VER = '10.12.2';
+  var db = null, auth = null, usingFirebase = false;
+  var CFG = window.RIFA_CONFIG || {};
+  var ADMIN_FALLBACK_PIN = '32397238';
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function pad(n){ return String(n).padStart(3,'0'); }
+
+  function daysLeft(){
+    var end = new Date('2026-12-24T23:59:59');
+    var now = new Date();
+    var d = Math.ceil((end-now)/86400000);
+    return d;
+  }
+
+  function bannerHTML(){
+    var d = daysLeft();
+    return '<b>Rifa activa</b><br>Vigente hasta el 24 de diciembre de 2026' +
+      (d>0 ? (' · faltan ' + d + ' días') : ' · ¡última recta!');
+  }
+  function renderBanner(){ bannerEl.innerHTML = bannerHTML(); bannerStartEl.innerHTML = bannerHTML(); }
+
+  var WHATSAPP_NUMBER = '584262152360';
+
+  function animateOutThen(container, cb){
+    var bars = container.querySelectorAll('.bar');
+    if(!bars.length){ cb(); return; }
+    bars.forEach(function(b){ b.classList.add('bar-exit'); });
+    setTimeout(cb, 200);
+  }
+
+  function enterScreen(admin){
+    isAdmin = admin;
+    animateOutThen(screenStart, function(){
+      screenStart.style.display = 'none';
+      screenStart.querySelectorAll('.bar-exit').forEach(function(b){ b.classList.remove('bar-exit'); });
+      mainScreen.style.display = '';
+      mainScreen.classList.add('pop');
+      setTimeout(function(){ mainScreen.classList.remove('pop'); }, 350);
+      modeBadge.textContent = admin ? 'Admin' : 'Invitado';
+      modeBadge.className = 'badge ' + (admin ? 'admin' : 'guest');
+      syncAdminUI();
+      renderGrid();
+    });
+  }
+
+  document.getElementById('goGuest').onclick = function(){ enterScreen(false); };
+  document.getElementById('goAdmin').onclick = function(){
+    if(isAdmin){ enterScreen(true); return; }
+    if(usingFirebase){
+      openAdminLogin();
+      return;
+    }
+    openPinLogin();
+  };
+  document.getElementById('backBtn').onclick = function(){
+    animateOutThen(mainScreen, function(){
+      mainScreen.style.display = 'none';
+      mainScreen.querySelectorAll('.bar-exit').forEach(function(b){ b.classList.remove('bar-exit'); });
+      screenStart.style.display = '';
+    });
+  };
+
+  function setSync(state, label){
+    document.querySelectorAll('.syncBar').forEach(function(el){
+      el.className = 'syncBar' + (el.id === 'syncBar' ? ' bar' : '') + ' ' + state;
+      var t = el.querySelector('.txt');
+      if(t) t.textContent = label;
+    });
+  }
+  function setAdminBtn(){
+    var b = document.getElementById('goAdmin');
+    b.textContent = isAdmin ? '🔓 Entrar como Admin (sesión activa)' : '🔑 Entrar como Admin';
+  }
+
+  function syncAdminUI(){
+    modeBadge.textContent = isAdmin ? 'Admin' : 'Invitado';
+    modeBadge.className = 'badge ' + (isAdmin ? 'admin' : 'guest');
+    document.getElementById('adminPanelBtn').style.display = isAdmin ? '' : 'none';
+    setAdminBtn();
+  }
+
+  function openAdminLogin(){
+    var ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = '<div class="card">' +
+      '<h2>Acceso Admin</h2>' +
+      '<p>Inicia sesión con tu cuenta para gestionar los números</p>' +
+      '<input type="email" id="admEmail" placeholder="correo@ejemplo.com" value="' + esc(CFG.adminEmail) + '" autocomplete="username">' +
+      '<input type="password" id="admPass" placeholder="Contraseña" autocomplete="current-password">' +
+      '<p class="formErr" id="admErr"></p>' +
+      '<div class="row"><button class="btn ghost" id="cancel">Cancelar</button>' +
+      '<button class="btn primary" id="admBtn">Entrar</button></div></div>';
+    document.body.appendChild(ov);
+    var email = ov.querySelector('#admEmail');
+    var pass = ov.querySelector('#admPass');
+    var err = ov.querySelector('#admErr');
+    var btn = ov.querySelector('#admBtn');
+    function attempt(){
+      var mail = email.value.trim();
+      if(!mail || !pass.value){ err.textContent = 'Completa el correo y la contraseña'; return; }
+      err.textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'Verificando…';
+      auth.signInWithEmailAndPassword(mail, pass.value).then(function(cred){
+        var user = cred && cred.user;
+        var mail2 = user && user.email ? user.email.toLowerCase() : '';
+        if(mail2 !== String(CFG.adminEmail).toLowerCase()){
+          return auth.signOut().then(function(){
+            btn.disabled = false;
+            btn.textContent = 'Entrar';
+            err.textContent = 'Esa cuenta no es administradora de la rifa';
+            pass.value = '';
+          });
+        }
+        isAdmin = true;
+        syncAdminUI();
+        ov.remove();
+        enterScreen(true);
+      }).catch(function(e){
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+        var code = e && e.code ? e.code : '';
+        if(code === 'auth/invalid-email') err.textContent = 'El correo no es válido';
+        else if(code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials')
+          err.textContent = 'Correo o contraseña incorrectos';
+        else if(code === 'auth/too-many-requests') err.textContent = 'Demasiados intentos. Espera unos minutos';
+        else if(code === 'auth/network-request-failed') err.textContent = 'Sin conexión a internet';
+        else err.textContent = 'No se pudo iniciar sesión';
+        pass.value = '';
+        pass.focus();
+      });
+    }
+    email.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); pass.focus(); } });
+    pass.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); attempt(); } });
+    btn.onclick = attempt;
+    ov.querySelector('#cancel').onclick = function(){ ov.remove(); };
+    (email.value ? pass : email).focus();
+  }
+
+  function openPinLogin(){
+    var ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = '<div class="card">' +
+      '<h2>Acceso Admin</h2>' +
+      '<p>La base de datos no está configurada, así que la clave está en el propio archivo. ' +
+      'Configura Firebase en <b>window.RIFA_CONFIG</b> para entrar con tu cuenta y compartir los datos en vivo.</p>' +
+      '<input type="password" id="pinInput" placeholder="Clave" inputmode="numeric" autocomplete="off">' +
+      '<div class="row"><button class="btn ghost" id="cancel">Cancelar</button>' +
+      '<button class="btn primary" id="pinBtn">Entrar</button></div></div>';
+    document.body.appendChild(ov);
+    var input = ov.querySelector('#pinInput');
+    function attempt(){
+      if(input.value.trim() === ADMIN_FALLBACK_PIN){ ov.remove(); enterScreen(true); return; }
+      toast('Clave incorrecta');
+      input.value = '';
+      input.focus();
+    }
+    input.focus();
+    input.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); attempt(); } });
+    ov.querySelector('#pinBtn').onclick = attempt;
+    ov.querySelector('#cancel').onclick = function(){ ov.remove(); };
+  }
+
+  document.getElementById('logoutBtn').onclick = function(){
+    function leaveAdmin(){
+      isAdmin = false;
+      syncAdminUI();
+      animateOutThen(adminScreen, function(){
+        adminScreen.style.display = 'none';
+        adminScreen.querySelectorAll('.bar-exit').forEach(function(b){ b.classList.remove('bar-exit'); });
+        mainScreen.style.display = '';
+      });
+    }
+    if(usingFirebase && auth){
+      auth.signOut().then(function(){
+        leaveAdmin();
+        toast('Sesión de admin cerrada');
+      }).catch(function(){ toast('No se pudo cerrar la sesión'); });
+      return;
+    }
+    leaveAdmin();
+    toast('Modo admin cerrado');
+  };
+
+  document.getElementById('adminPanelBtn').onclick = function(){
+    if(!isAdmin){ toast('Solo el admin puede modificar datos'); return; }
+    animateOutThen(mainScreen, function(){
+      mainScreen.style.display = 'none';
+      mainScreen.querySelectorAll('.bar-exit').forEach(function(b){ b.classList.remove('bar-exit'); });
+      adminScreen.style.display = '';
+      adminSearchEl.value = '';
+      renderAdminList();
+    });
+  };
+  document.getElementById('adminBack').onclick = function(){
+    animateOutThen(adminScreen, function(){
+      adminScreen.style.display = 'none';
+      adminScreen.querySelectorAll('.bar-exit').forEach(function(b){ b.classList.remove('bar-exit'); });
+      mainScreen.style.display = '';
+    });
+  };
+  adminSearchEl.addEventListener('input', renderAdminList);
+
+  document.getElementById('shareBtn').onclick = function(){
+    var url = window.location.href.split('?')[0];
+    var text = '🎄 Participa en la Gran Mega Rifa Navideña — premio principal iPhone 18 Pro Max, número a $5: ' + url;
+    if(navigator.share){ navigator.share({title:'Gran Mega Rifa Navideña', text:text}).catch(function(){}); }
+    else { navigator.clipboard.writeText(text).then(function(){ toast('Enlace copiado para compartir'); }); }
+  };
+
+  document.getElementById('onlyFree').addEventListener('change', function(){
+    renderGrid(searchEl.value.replace(/[^0-9]/g,'') || null);
+  });
+
+  function stats(){
+    var taken = Object.keys(registros).length;
+    statsEl.textContent = taken + ' de ' + TOTAL + ' números ocupados · ' + (TOTAL-taken) + ' disponibles';
+    var pct = Math.min(100, Math.round((taken/TOTAL)*100));
+    var fill = document.getElementById('progressFill');
+    var txt = document.getElementById('progressText');
+    if(fill) fill.style.width = pct + '%';
+    if(txt) txt.textContent = taken + ' vendidos (' + pct + '%)';
+  }
+
+  function renderGrid(filter){
+    grid.innerHTML = '';
+    var onlyFreeEl = document.getElementById('onlyFree');
+    var onlyFree = onlyFreeEl && onlyFreeEl.checked;
+    var frag = document.createDocumentFragment();
+    for(var i=0;i<TOTAL;i++){
+      var num = pad(i);
+      var taken = !!registros[num];
+      if(onlyFree && taken) continue;
+      var el = document.createElement('div');
+      el.className = 'num' + (taken?' taken':'');
+      el.dataset.num = num;
+      el.textContent = num;
+      if(filter && num.indexOf(filter) === -1){ el.classList.add('dim'); }
+      frag.appendChild(el);
+    }
+    grid.appendChild(frag);
+    stats();
+  }
+
+  grid.addEventListener('click', function(e){
+    var el = e.target.closest('.num');
+    if(!el || el.classList.contains('dim')) return;
+    var num = el.dataset.num;
+    var taken = !!registros[num];
+    if(!isAdmin){
+      if(taken){ toast('Número ' + num + ': Ocupado'); }
+      else { openReserve(num); }
+      return;
+    }
+    if(taken){ openRelease(num); } else { openRegister(num); }
+  });
+
+  function openReserve(num){
+    var msg = encodeURIComponent('Hola, quiero reservar el número ' + num + ' de la Gran Mega Rifa Navideña 🎄');
+    var ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = '<div class="card">' +
+      '<h2>Número ' + num + '</h2>' +
+      '<p>Está disponible. Puedes reservarlo escribiendo directamente por WhatsApp.</p>' +
+      '<a class="waLink" href="https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg + '" target="_blank">💬 Reservar por WhatsApp</a>' +
+      '<div class="row" style="margin-top:10px"><button class="btn ghost" id="cancel">Cerrar</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#cancel').onclick = function(){ ov.remove(); };
+  }
+
+  searchEl.addEventListener('input', function(){
+    var v = searchEl.value.replace(/[^0-9]/g,'');
+    renderGrid(v || null);
+  });
+
+  function openRegister(num){
+    var ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = '<div class="card">' +
+      '<h2>Registrar número ' + num + '</h2>' +
+      '<p>Ingresa el nombre y apellido del participante</p>' +
+      '<input type="text" id="fNombre" placeholder="Nombre">' +
+      '<input type="text" id="fApellido" placeholder="Apellido">' +
+      '<input type="text" id="fCedula" placeholder="Cédula" inputmode="numeric">' +
+      '<input type="text" id="fTelefono" placeholder="Teléfono" inputmode="tel">' +
+      '<div class="row"><button class="btn ghost" id="cancel">Cancelar</button>' +
+      '<button class="btn primary" id="confirm">Guardar</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#cancel').onclick = function(){ ov.remove(); };
+    ov.querySelector('#confirm').onclick = function(){
+      var nombre = document.getElementById('fNombre').value.trim();
+      var apellido = document.getElementById('fApellido').value.trim();
+      var cedula = document.getElementById('fCedula').value.trim();
+      var telefono = document.getElementById('fTelefono').value.trim();
+      if(!nombre || !apellido){ toast('Completa nombre y apellido'); return; }
+      registros[num] = { nombre: nombre, apellido: apellido, cedula: cedula, telefono: telefono };
+      persistNumber(num, registros[num]);
+      ov.remove();
+      applyLocal();
+      pop(num);
+      confetti();
+      toast('Número ' + num + ' registrado a ' + nombre + ' ' + apellido);
+    };
+  }
+
+  function openRelease(num){
+    var r = registros[num] || {};
+    var ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = '<div class="card">' +
+      '<h2>Número ' + num + '</h2>' +
+      '<p>Registrado a: <b>' + esc(((r.nombre||'') + ' ' + (r.apellido||'')).trim() || 'Sin nombre') + '</b>' +
+      (r.cedula ? '<br>Cédula: ' + esc(r.cedula) : '') +
+      (r.telefono ? '<br>Teléfono: ' + esc(r.telefono) : '') + '</p>' +
+      '<div class="row"><button class="btn primary" id="editar">✏️ Editar datos</button>' +
+      '<button class="btn danger" id="liberar">Liberar</button></div>' +
+      '<div class="row" style="margin-top:8px"><button class="btn ghost" id="cancel">Cerrar</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#cancel').onclick = function(){ ov.remove(); };
+    ov.querySelector('#editar').onclick = function(){ ov.remove(); openEdit(num); };
+    ov.querySelector('#liberar').onclick = function(){
+      delete registros[num];
+      persistNumber(num, null);
+      ov.remove();
+      applyLocal();
+      toast('Número ' + num + ' liberado');
+    };
+  }
+
+  function openEdit(num){
+    var r = registros[num];
+    if(!r){ toast('El número ' + num + ' ya está libre'); refreshAdminList(); return; }
+    var ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = '<div class="card">' +
+      '<h2>Editar número ' + num + '</h2>' +
+      '<p>Modifica los datos del participante</p>' +
+      '<input type="text" id="fNombre" placeholder="Nombre" value="' + esc(r.nombre) + '">' +
+      '<input type="text" id="fApellido" placeholder="Apellido" value="' + esc(r.apellido) + '">' +
+      '<input type="text" id="fCedula" placeholder="Cédula" inputmode="numeric" value="' + esc(r.cedula) + '">' +
+      '<input type="text" id="fTelefono" placeholder="Teléfono" inputmode="tel" value="' + esc(r.telefono) + '">' +
+      '<div class="row"><button class="btn ghost" id="cancel">Cancelar</button>' +
+      '<button class="btn primary" id="confirm">Guardar cambios</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#cancel').onclick = function(){ ov.remove(); };
+    ov.querySelector('#confirm').onclick = function(){
+      var nombre = document.getElementById('fNombre').value.trim();
+      var apellido = document.getElementById('fApellido').value.trim();
+      var cedula = document.getElementById('fCedula').value.trim();
+      var telefono = document.getElementById('fTelefono').value.trim();
+      if(!nombre || !apellido){ toast('Completa nombre y apellido'); return; }
+      registros[num] = { nombre: nombre, apellido: apellido, cedula: cedula, telefono: telefono };
+      persistNumber(num, registros[num]);
+      ov.remove();
+      applyLocal();
+      toast('Número ' + num + ' actualizado');
+    };
+  }
+
+  function releaseConfirm(num){
+    var r = registros[num] || {};
+    var ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = '<div class="card">' +
+      '<h2>Liberar número ' + num + '</h2>' +
+      '<p>Se borrará el registro de <b>' + esc(((r.nombre||'') + ' ' + (r.apellido||'')).trim() || 'Sin nombre') +
+      '</b> y el número quedará disponible.</p>' +
+      '<div class="row"><button class="btn ghost" id="cancel">Cancelar</button>' +
+      '<button class="btn danger" id="ok">Liberar</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#cancel').onclick = function(){ ov.remove(); };
+    ov.querySelector('#ok').onclick = function(){
+      delete registros[num];
+      persistNumber(num, null);
+      ov.remove();
+      applyLocal();
+      toast('Número ' + num + ' liberado');
+    };
+  }
+
+  function renderAdminList(){
+    var q = (adminSearchEl.value || '').toLowerCase().trim();
+    var nums = Object.keys(registros).sort();
+    var rows = nums.filter(function(num){
+      if(!q) return true;
+      var r = registros[num] || {};
+      return (num + ' ' + (r.nombre||'') + ' ' + (r.apellido||'') + ' ' + (r.cedula||'') + ' ' + (r.telefono||''))
+        .toLowerCase().indexOf(q) > -1;
+    });
+    document.getElementById('recCount').textContent = q
+      ? rows.length + ' de ' + nums.length + ' registros'
+      : nums.length + (nums.length === 1 ? ' registro' : ' registros');
+    document.getElementById('recTotal').textContent = nums.length;
+    recListEl.innerHTML = '';
+    if(!rows.length){
+      var em = document.createElement('div');
+      em.className = 'empty';
+      em.textContent = nums.length ? 'Ningún registro coincide con la búsqueda' : 'Todavía no hay números registrados';
+      recListEl.appendChild(em);
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    rows.forEach(function(num){
+      var r = registros[num] || {};
+      var det = [];
+      if(r.cedula) det.push('Cédula: ' + r.cedula);
+      if(r.telefono) det.push('Tel: ' + r.telefono);
+      var el = document.createElement('div');
+      el.className = 'rec';
+      el.innerHTML = '<div class="rnum">' + num + '</div>' +
+        '<div class="info"><b>' + esc(((r.nombre||'') + ' ' + (r.apellido||'')).trim() || 'Sin nombre') + '</b>' +
+        '<span>' + esc(det.join(' · ') || 'Sin datos adicionales') + '</span></div>' +
+        '<div class="acts"><button class="btn primary small" data-act="edit">Editar</button>' +
+        '<button class="btn danger small" data-act="del">Liberar</button></div>';
+      el.querySelector('[data-act="edit"]').onclick = function(){ openEdit(num); };
+      el.querySelector('[data-act="del"]').onclick = function(){ releaseConfirm(num); };
+      frag.appendChild(el);
+    });
+    recListEl.appendChild(frag);
+  }
+
+  function refreshAdminList(){
+    if(adminScreen.style.display !== 'none') renderAdminList();
+  }
+
+  function pop(num){
+    var el = grid.querySelector('[data-num="'+num+'"]');
+    if(el){ el.classList.add('pop'); setTimeout(function(){el.classList.remove('pop');},350); }
+  }
+
+  function confetti(){
+    var colors=['#c0392b','#c9973b','#1e8a5f','#3b6ac9'];
+    for(var i=0;i<16;i++){
+      var c = document.createElement('div');
+      c.className='confetti';
+      c.style.left = (45+Math.random()*10)+'vw';
+      c.style.background = colors[i%colors.length];
+      c.style.animationDuration = (1+Math.random()*0.8)+'s';
+      document.body.appendChild(c);
+      (function(node){ setTimeout(function(){ node.remove(); }, 2000); })(c);
+    }
+  }
+
+  var toastTimer;
+  function toast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+
+  function applyLocal(){
+    renderGrid(searchEl.value.replace(/[^0-9]/g,'') || null);
+    refreshAdminList();
+  }
+
+  function saveLocal(){
+    try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(registros)); }catch(e){}
+  }
+
+  function persistNumber(num, data){
+    if(usingFirebase && db && auth && auth.currentUser){
+      var node = db.ref('rifa/registros/' + num);
+      var p = data ? node.set(data) : node.remove();
+      return p.catch(function(e){
+        setSync('error', '● No se pudo guardar, revisa la conexión');
+        toast('No se pudo guardar en la base de datos');
+      });
+    }
+    if(docRef){
+      docRef.set({ registros: registros }).catch(function(){
+        saveLocal();
+        toast('No se pudo sincronizar (guardado local en tu vista)');
+      });
+      return;
+    }
+    saveLocal();
+  }
+
+  function firebaseConfigured(){
+    return !!(CFG.apiKey && CFG.authDomain && CFG.databaseURL && CFG.adminEmail);
+  }
+
+  function loadScript(src){
+    return new Promise(function(resolve, reject){
+      var s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error('No se pudo cargar ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function startRealtime(){
+    db.ref('rifa/registros').on('value', function(snap){
+      var v = snap.val();
+      registros = v || {};
+      if(!usingFirebase) saveLocal();
+      applyLocal();
+    }, function(){
+      setSync('error', '● No se pudo leer la base de datos');
+    });
+    db.ref('.info/connected').on('value', function(snap){
+      if(snap.val()) setSync('live', '● En vivo — los cambios aparecen al instante');
+      else setSync('connecting', '● Reconectando…');
+    });
+  }
+
+  function watchAuth(){
+    auth.onAuthStateChanged(function(user){
+      var ok = !!(user && user.email && CFG.adminEmail &&
+        user.email.toLowerCase() === String(CFG.adminEmail).toLowerCase());
+      if(ok){
+        isAdmin = true;
+      }else{
+        isAdmin = false;
+        if(user && auth) auth.signOut();
+      }
+      syncAdminUI();
+    });
+  }
+
+  async function initData(){
+    if(!firebaseConfigured()){
+      setSync('local', '● Modo local — configura Firebase para compartir los datos');
+      loadLocalData();
+      startClaudeDB();
+      return;
+    }
+    try{
+      setSync('connecting', '● Conectando con la base de datos…');
+      await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-app-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-database-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/' + FB_VER + '/firebase-auth-compat.js');
+      firebase.initializeApp({
+        apiKey: CFG.apiKey,
+        authDomain: CFG.authDomain,
+        databaseURL: CFG.databaseURL
+      });
+      db = firebase.database();
+      auth = firebase.auth();
+      try{ await db.enablePersistence(); }catch(e){}
+      usingFirebase = true;
+      startRealtime();
+      watchAuth();
+    }catch(e){
+      usingFirebase = false;
+      db = null;
+      auth = null;
+      setSync('error', '● No se pudo conectar con Firebase — revisa la configuración');
+      loadLocalData();
+      startClaudeDB();
+    }
+  }
+
+  function loadLocalData(){
+    try{
+      var s = localStorage.getItem(LOCAL_KEY);
+      if(s){ var v = JSON.parse(s); if(v && Object.keys(v).length) registros = v; }
+    }catch(e){}
+  }
+
+  function startClaudeDB(){
+    if(!(window.claude && window.claude.use)) return;
+    try{
+      docRef = dbRef.doc('rifa/estado');
+      docRef.onSnapshot(function(snap){
+        var d = snap && snap.data ? snap.data : null;
+        if(d && d.registros){ registros = d.registros; applyLocal(); }
+      });
+    }catch(e){ docRef = null; }
+  }
+
+  async function initClaude(){
+    try{
+      dbRef = await window.claude.use('db');
+      userCap = await window.claude.use('user');
+    }catch(e){ dbRef = null; userCap = null; }
+    if(userCap){
+      try{
+        var can = userCap.canEdit ? userCap.canEdit() : false;
+        if(can && !usingFirebase){ isAdmin = true; syncAdminUI(); }
+      }catch(e){}
+    }
+  }
+
+  renderBanner();
+  setSync('connecting', '● Conectando…');
+  initData();
+  if(window.claude && window.claude.use){ initClaude(); }
+})();
+</script>
+</body>
+</html>
