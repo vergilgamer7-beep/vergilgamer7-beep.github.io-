@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gran Mega Rifa Navideña</title>
+<style>
+  :root{
+    --bg:#2b0d14; --bg2:#4a0f1c; --surface:#3a1420; --text:#fbeee7; --muted:#e8b9a8;
+    --border:#6b2333; --accent:#c0392b; --accent2:#1e8a5f;
+    --taken:#7a2331; --taken-bg:#4a1622; --free:#3a1a23; --free-border:#8a3348;
+    --gold:#e8b84b; --gold2:#fff2c9;
+    box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  html{scroll-padding-top:env(safe-area-inset-top,0px)}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(circle at 50% 0%,var(--bg2),var(--bg) 70%);
+    color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100%}
+  #app{max-width:900px;margin:0 auto;padding:18px 14px 60px}
+  h1{font-size:1.6rem;margin:.2em 0 .05em;text-align:center;font-weight:800;line-height:1.15;
+    background:linear-gradient(90deg,#fff,var(--gold2) 55%,var(--gold));-webkit-background-clip:text;
+    background-clip:text;color:transparent;text-shadow:0 2px 18px rgba(232,184,75,.25)}
+  .sub{color:var(--muted);text-align:center;font-size:.85rem;margin-bottom:14px}
+  .banner{background:linear-gradient(135deg,var(--accent),var(--gold));color:#fff;border-radius:14px;
+    padding:12px 16px;text-align:center;font-size:.9rem;margin-bottom:16px;
+    box-shadow:0 4px 18px rgba(232,184,75,.25),0 0 0 1px rgba(255,255,255,.08) inset;
+    animation:fadeDown .5s ease, glow 2.4s ease-in-out infinite}
+  .banner b{font-size:1.1rem;letter-spacing:.03em;text-transform:uppercase}
+  @keyframes glow{0%,100%{box-shadow:0 4px 18px rgba(232,184,75,.25)}50%{box-shadow:0 4px 26px rgba(232,184,75,.55)}}
+  @keyframes fadeDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+  input[type=search]{flex:1;min-width:160px;padding:10px 12px;border-radius:10px;
+    border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:1rem}
+  .legend{display:flex;gap:14px;justify-content:center;margin-bottom:12px;font-size:.78rem;color:var(--muted)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .dot.free{background:var(--free-border)} .dot.taken{background:var(--taken)}
+  #stats{text-align:center;font-size:.82rem;color:var(--muted);margin-bottom:10px}
+  #grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:6px}
+  .num{border:1px solid var(--free-border);background:var(--free);border-radius:8px;padding:8px 0;
+    text-align:center;font-weight:600;font-size:.82rem;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;
+    user-select:none}
+  .num:hover{transform:scale(1.08);box-shadow:0 3px 8px rgba(0,0,0,.12)}
+  .num.taken{background:var(--taken-bg);border-color:var(--taken);color:var(--taken)}
+  .num.dim{opacity:.15;pointer-events:none}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;
+    z-index:50;padding:16px;animation:fadeDown .18s ease}
+  .card{background:var(--surface);border-radius:16px;padding:20px;max-width:340px;width:100%;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+  .card h2{margin:0 0 4px;font-size:1.1rem} .card p{color:var(--muted);font-size:.85rem;margin:0 0 12px}
+  .row{display:flex;gap:8px}
+  button.btn{flex:1;padding:10px;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.9rem}
+  .btn.primary{background:var(--accent2);color:#fff} .btn.ghost{background:var(--border);color:var(--text)}
+  .btn.big{width:100%;padding:16px;font-size:1rem}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--text);color:var(--bg);
+    padding:10px 18px;border-radius:999px;font-size:.85rem;opacity:0;transition:all .25s ease;pointer-events:none;
+    max-width:90vw;text-align:center}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+  #screenStart{max-width:420px;margin:40px auto 0;text-align:center;animation:fadeDown .4s ease}
+  .startCard{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;margin-top:18px}
+  .startHint{color:var(--muted);font-size:.78rem;margin:0 0 4px}
+  .prizes{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+  .prize{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--surface),var(--bg2));
+    border:1px solid var(--gold);border-radius:14px;padding:12px 14px;text-align:left;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  .prize.first{border-width:2px;box-shadow:0 4px 20px rgba(232,184,75,.4)}
+  .prize .icon{flex:0 0 auto;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:1.3rem;background:radial-gradient(circle,var(--gold),var(--accent));box-shadow:0 0 12px rgba(232,184,75,.5)}
+  .prize .label{font-size:.72rem;color:var(--gold2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+  .prize .value{font-size:1.15rem;font-weight:800;color:#fff} .prize .note{font-size:.7rem;color:var(--muted)}
+  .valuePill{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--accent),#7a1520);
+    border:1px solid var(--gold);border-radius:999px;padding:8px 20px;margin:6px 0 14px;box-shadow:0 4px 14px rgba(232,184,75,.3)}
+  .valuePill span{color:var(--gold2);font-size:.78rem} .valuePill b{color:var(--gold);font-size:1.3rem}
+  .drawNote{font-size:.72rem;color:var(--muted);border:1px dashed var(--border);border-radius:999px;padding:6px 14px;display:inline-block}
+  .miniBanner{background:linear-gradient(135deg,var(--surface),var(--bg2));border:1px solid var(--gold);
+    border-radius:12px;padding:8px 12px;text-align:center;font-size:.78rem;color:var(--gold2);margin-bottom:12px}
+  .miniBanner b{color:#fff}
+  .progressWrap{margin-bottom:12px}
+  .progressLabel{display:flex;justify-content:space-between;font-size:.72rem;color:var(--muted);margin-bottom:4px}
+  .progressTrack{height:10px;border-radius:999px;background:var(--surface);border:1px solid var(--border);overflow:hidden;position:relative}
+  .progressFill{height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:999px;transition:width .5s ease;width:0%}
+  .progressTrack::after{content:'';position:absolute;left:80%;top:-2px;bottom:-2px;width:2px;background:var(--gold2);opacity:.8}
+  .toggleRow{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);white-space:nowrap}
+  .waLink{display:block;text-align:center;background:#25D366;color:#fff;border-radius:8px;padding:10px;text-decoration:none;font-weight:600;margin-top:6px}
+  .topRow{display:flex;justify-content:flex-end;margin-bottom:10px}
+  .shareBtn{background:var(--border);color:var(--text);border:none;border-radius:8px;padding:8px 10px;font-size:.8rem;cursor:pointer}
+  .bar{animation:fadeDown .4s ease}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="screenStart">
+    <h1>🎄 Gran Mega Rifa Navideña</h1>
+    <div class="sub">Consulta la disponibilidad de tu número de la suerte</div>
+    <div class="banner" id="bannerStart"></div>
+    <div class="prizes">
+      <div class="prize first"><div class="icon">👑</div><div><div class="label">Premio principal · 1er lugar</div>
+        <div class="value">iPhone 18 Pro Max</div><div class="note">Sorteo Lotería Chance · Letra A 12:00 PM</div></div></div>
+      <div class="prize"><div class="icon">💵</div><div><div class="label">2do lugar</div>
+        <div class="value">$300 en efectivo</div><div class="note">Sorteo Lotería Chance · Letra B 12:00 PM</div></div></div>
+      <div class="prize"><div class="icon">💵</div><div><div class="label">3er lugar</div>
+        <div class="value">$100 en efectivo</div><div class="note">Sorteo Lotería Chance · Letra A 1:00 PM</div></div></div>
+    </div>
+    <div style="text-align:center">
+      <div class="valuePill"><span>Valor del número</span><b>$5</b></div><br>
+      <div class="drawNote">❄️ El sorteo se realizará al vender el 80% de los números ❄️</div>
+    </div>
+    <div class="startCard">
+      <button class="btn primary big" id="goGuest">👥 Ver números disponibles</button>
+      <p class="startHint">Busca tu número y resérvalo por WhatsApp</p>
+    </div>
+  </div>
+
+  <div id="mainScreen" style="display:none">
+    <div class="topRow"><button class="shareBtn" id="shareBtn">📤 Compartir</button></div>
+    <div class="banner bar" id="banner"></div>
+    <div class="miniBanner bar">🎁 <b>iPhone 18 Pro Max</b> de premio principal · número a <b>$5</b></div>
+    <div class="progressWrap bar">
+      <div class="progressLabel"><span id="progressText">0 vendidos</span><span>Meta sorteo: 80%</span></div>
+      <div class="progressTrack"><div class="progressFill" id="progressFill"></div></div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Buscar número (ej: 042)">
+      <label class="toggleRow"><input type="checkbox" id="onlyFree"> Solo disponibles</label>
+    </div>
+    <div class="legend"><span><span class="dot free"></span>Disponible</span><span><span class="dot taken"></span>Ocupado</span></div>
+    <div id="stats"></div>
+    <div id="grid"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+(function(){
+  // ====== CONFIGURA ESTO ======
+  // 1. Ve a https://jsonblob.com, pega  {"registros":{}}  y guarda.
+  // 2. Copia el ID que aparece en la URL resultante (después de /api/jsonBlob/) y pégalo aquí.
+  // Debe ser EXACTAMENTE el mismo ID que pongas en admin.html
+  var BLOB_ID = 'PEGA-AQUI-TU-BLOB-ID';
+  // =============================
+  var API = 'https://jsonblob.com/api/jsonBlob/' + BLOB_ID;
+  var TOTAL = 1000;
+  var WHATSAPP_NUMBER = '584262152360';
+  var registros = {};
+
+  var grid = document.getElementById('grid');
+  var searchEl = document.getElementById('search');
+  var statsEl = document.getElementById('stats');
+  var bannerEl = document.getElementById('banner');
+  var bannerStartEl = document.getElementById('bannerStart');
+  var screenStart = document.getElementById('screenStart');
+  var mainScreen = document.getElementById('mainScreen');
+
+  function pad(n){ return String(n).padStart(3,'0'); }
+  function daysLeft(){ var d = Math.ceil((new Date('2026-12-24T23:59:59')-new Date())/86400000); return d; }
+  function bannerHTML(){
+    var d = daysLeft();
+    return '<b>Rifa activa</b><br>Vigente hasta el 24 de diciembre de 2026' + (d>0 ? (' · faltan ' + d + ' días') : ' · ¡última recta!');
+  }
+  function renderBanner(){ bannerEl.innerHTML = bannerHTML(); bannerStartEl.innerHTML = bannerHTML(); }
+
+  function stats(){
+    var taken = Object.keys(registros).length;
+    statsEl.textContent = taken + ' de ' + TOTAL + ' números ocupados · ' + (TOTAL-taken) + ' disponibles';
+    var pct = Math.min(100, Math.round((taken/TOTAL)*100));
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').textContent = taken + ' vendidos (' + pct + '%)';
+  }
+
+  function renderGrid(filter){
+    grid.innerHTML = '';
+    var onlyFree = document.getElementById('onlyFree').checked;
+    var frag = document.createDocumentFragment();
+    for(var i=0;i<TOTAL;i++){
+      var num = pad(i);
+      var taken = !!registros[num];
+      if(onlyFree && taken) continue;
+      var el = document.createElement('div');
+      el.className = 'num' + (taken?' taken':'');
+      el.dataset.num = num;
+      el.textContent = num;
+      if(filter && num.indexOf(filter) === -1){ el.classList.add('dim'); }
+      frag.appendChild(el);
+    }
+    grid.appendChild(frag);
+    stats();
+  }
+
+  grid.addEventListener('click', function(e){
+    var el = e.target.closest('.num');
+    if(!el || el.classList.contains('dim')) return;
+    var num = el.dataset.num;
+    if(registros[num]){ toast('Número ' + num + ': Ocupado'); return; }
+    var msg = encodeURIComponent('Hola, quiero reservar el número ' + num + ' de la Gran Mega Rifa Navideña 🎄');
+    var ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = '<div class="card"><h2>Número ' + num + '</h2>' +
+      '<p>Está disponible. Puedes reservarlo escribiendo directamente por WhatsApp.</p>' +
+      '<a class="waLink" href="https://wa.me/' + WHATSAPP_NUMBER + '?text=' + msg + '" target="_blank">💬 Reservar por WhatsApp</a>' +
+      '<div class="row" style="margin-top:10px"><button class="btn ghost" id="cancel">Cerrar</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#cancel').onclick = function(){ ov.remove(); };
+  });
+
+  searchEl.addEventListener('input', function(){ renderGrid(searchEl.value.replace(/[^0-9]/g,'') || null); });
+  document.getElementById('onlyFree').addEventListener('change', function(){ renderGrid(searchEl.value.replace(/[^0-9]/g,'') || null); });
+
+  document.getElementById('goGuest').onclick = function(){
+    screenStart.style.display = 'none';
+    mainScreen.style.display = '';
+    renderGrid();
+  };
+
+  document.getElementById('shareBtn').onclick = function(){
+    var url = window.location.href;
+    var text = '🎄 Participa en la Gran Mega Rifa Navideña — premio principal iPhone 18 Pro Max, número a $5: ' + url;
+    if(navigator.share){ navigator.share({title:'Gran Mega Rifa Navideña', text:text}).catch(function(){}); }
+    else { navigator.clipboard.writeText(text).then(function(){ toast('Enlace copiado para compartir'); }); }
+  };
+
+  var toastTimer;
+  function toast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+
+  function loadData(){
+    fetch(API).then(function(r){ return r.json(); }).then(function(d){
+      registros = (d && d.registros) ? d.registros : {};
+      if(mainScreen.style.display !== 'none'){ renderGrid(searchEl.value.replace(/[^0-9]/g,'') || null); }
+    }).catch(function(){});
+  }
+
+  renderBanner();
+  loadData();
+  setInterval(loadData, 6000); // refresco automático cada 6s
+})();
+</script>
+</body>
+</html>
